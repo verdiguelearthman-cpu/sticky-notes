@@ -10,6 +10,8 @@ use tauri::{
     AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 // ─── Data Model ───
 
@@ -227,6 +229,64 @@ fn show_all_notes(app: AppHandle, state: State<AppState>) -> Result<(), String> 
     Ok(())
 }
 
+// ─── Autostart Commands ───
+
+#[tauri::command]
+fn get_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch()
+        .is_enabled()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let autostart = app.autolaunch();
+    if enabled {
+        autostart.enable().map_err(|e| e.to_string())?;
+    } else {
+        autostart.disable().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+// ─── Hide/Show All Notes ───
+
+fn toggle_all_notes_visibility(app: &AppHandle) {
+    let state: State<AppState> = app.state();
+    let data = state.data.lock().unwrap();
+
+    // Check if any note windows are currently visible
+    let any_visible = data.notes.iter().any(|note| {
+        let label = format!("note-{}", note.id);
+        app.get_webview_window(&label)
+            .and_then(|w| w.is_visible().ok())
+            .unwrap_or(false)
+    });
+
+    if any_visible {
+        // Hide all note windows
+        for note in &data.notes {
+            let label = format!("note-{}", note.id);
+            if let Some(win) = app.get_webview_window(&label) {
+                let _ = win.hide();
+            }
+        }
+    } else {
+        // Show all note windows
+        for note in &data.notes {
+            let label = format!("note-{}", note.id);
+            if let Some(win) = app.get_webview_window(&label) {
+                let _ = win.show();
+                let _ = win.set_focus();
+            } else {
+                create_note_window(app, note).ok();
+            }
+        }
+    }
+}
+
 // ─── Reminder Scheduler ───
 
 fn start_reminder_scheduler(app: AppHandle) {
@@ -344,6 +404,16 @@ pub fn run() {
             // Init notification plugin
             app.handle().plugin(tauri_plugin_notification::init())?;
 
+            // Init autostart plugin (default: disabled, user can toggle)
+            app.handle().plugin(
+                tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"]))
+            )?;
+
+            // Init global shortcut plugin
+            app.handle().plugin(
+                tauri_plugin_global_shortcut::Builder::new().build()
+            )?;
+
             // Load data
             let data_path = get_data_path(app.handle());
             let data = load_data(&data_path);
@@ -412,6 +482,28 @@ pub fn run() {
             // Start reminder scheduler (polls every 30s)
             start_reminder_scheduler(app.handle().clone());
 
+            // Register global shortcuts
+            let app_handle_new = app.handle().clone();
+            let app_handle_toggle = app.handle().clone();
+
+            // Ctrl+Shift+N — create new note
+            let shortcut_new: Shortcut = "ctrl+shift+n".parse().expect("invalid shortcut");
+            // Ctrl+Shift+H — hide/show all notes
+            let shortcut_toggle: Shortcut = "ctrl+shift+h".parse().expect("invalid shortcut");
+
+            app.global_shortcut().on_shortcut(shortcut_new, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let state: State<AppState> = app_handle_new.state();
+                    let _ = create_note(app_handle_new.clone(), state, None);
+                }
+            })?;
+
+            app.global_shortcut().on_shortcut(shortcut_toggle, move |_app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    toggle_all_notes_visibility(&app_handle_toggle);
+                }
+            })?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -423,6 +515,8 @@ pub fn run() {
             update_note_position,
             update_note_size,
             show_all_notes,
+            get_autostart_enabled,
+            set_autostart_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

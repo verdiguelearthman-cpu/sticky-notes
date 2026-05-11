@@ -13,6 +13,8 @@ A lightweight desktop sticky notes app for Windows. Each note is an independent 
 - **System tray** — right-click: New Note, Show All, Quit; double-click: create note
 - **Local persistence** — notes, positions, and sizes saved as JSON, restored on startup
 - **Minimal footprint** — notes skip the taskbar, app lives in the system tray
+- **Global shortcuts** — `Ctrl+Shift+N` new note, `Ctrl+Shift+H` hide/show all
+- **Auto-start** — optional launch on system boot (disabled by default)
 
 ## Tech Stack
 
