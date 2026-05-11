@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import DOMPurify from 'dompurify';
 import { useNoteStore } from '../store/noteStore';
 import { getColorConfig, NOTE_COLORS } from '../types';
 import type { NoteColor } from '../types';
@@ -22,6 +23,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
     setContent,
     setColor,
     toggleCollapse,
+    togglePin,
     deleteNote,
     saveNote,
     setFocused,
@@ -30,6 +32,8 @@ export function StickyNote({ noteId }: { noteId: string }) {
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteTimer = useRef<ReturnType<typeof setTimeout>>();
   const contentRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -175,6 +179,18 @@ export function StickyNote({ noteId }: { noteId: string }) {
         </NoteButton>
 
         <NoteButton
+          title={note.pinned ? 'Unpin' : 'Pin to top'}
+          onClick={togglePin}
+          textColor={colorConfig.text}
+        >
+          <path
+            d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+            fill={colorConfig.text}
+            opacity={note.pinned ? 1 : 0.4}
+          />
+        </NoteButton>
+
+        <NoteButton
           title={note.collapsed ? 'Expand' : 'Collapse'}
           onClick={toggleCollapse}
           textColor={colorConfig.text}
@@ -185,10 +201,22 @@ export function StickyNote({ noteId }: { noteId: string }) {
           />
         </NoteButton>
 
-        <NoteButton title="Delete" onClick={deleteNote} textColor={colorConfig.text}>
+        <NoteButton
+          title={confirmDelete ? 'Click again to confirm' : 'Delete'}
+          onClick={() => {
+            if (confirmDelete) {
+              clearTimeout(deleteTimer.current);
+              deleteNote();
+            } else {
+              setConfirmDelete(true);
+              deleteTimer.current = setTimeout(() => setConfirmDelete(false), 2000);
+            }
+          }}
+          textColor={confirmDelete ? '#FF4444' : colorConfig.text}
+        >
           <path
             d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-            fill={colorConfig.text}
+            fill={confirmDelete ? '#FF4444' : colorConfig.text}
           />
         </NoteButton>
       </div>
@@ -213,7 +241,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
           suppressContentEditableWarning
           onInput={handleContentChange}
           spellCheck={false}
-          dangerouslySetInnerHTML={{ __html: note.content }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
           style={{
             flex: 1,
             padding: '4px 14px 8px',

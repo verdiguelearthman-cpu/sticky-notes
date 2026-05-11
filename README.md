@@ -1,73 +1,85 @@
-# React + TypeScript + Vite
+# StickyNotes
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A lightweight desktop sticky notes app for Windows. Each note is an independent always-on-top window that floats on your screen — like real sticky notes.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Multi-window** — each note is a separate OS window, freely draggable
+- **Always on top** — notes stay visible above other apps (toggleable per note)
+- **Transparency linked to focus** — blurred notes fade to 30% opacity, hover to restore
+- **6 color themes** — yellow, pink, blue, green, purple, orange
+- **Rich text editing** — with auto-save and HTML sanitization (DOMPurify)
+- **Timed reminders** — set date/time reminders with repeat (daily, weekly, weekday)
+- **System tray** — right-click: New Note, Show All, Quit; double-click: create note
+- **Local persistence** — notes, positions, and sizes saved as JSON, restored on startup
+- **Minimal footprint** — notes skip the taskbar, app lives in the system tray
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Layer | Technology |
+|---|---|
+| Framework | Tauri 2.x (Rust backend) |
+| Frontend | React 18 + TypeScript |
+| State | Zustand |
+| Build | Vite |
+| Notifications | tauri-plugin-notification |
 
-## Expanding the ESLint configuration
+## Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- [Node.js](https://nodejs.org/) >= 18
+- [Rust](https://rustup.rs/) stable toolchain
+- Windows: MSVC build tools (via Visual Studio Build Tools)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+```bash
+# Clone
+git clone https://github.com/verdiguelearthman-cpu/sticky-notes.git
+cd sticky-notes
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run tauri dev
+
+# Build for production (outputs MSI/NSIS installer)
+npm run tauri build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Project Structure
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/                    # React frontend
+  components/
+    StickyNote.tsx      # Core note component (drag, edit, opacity)
+    ColorPicker.tsx     # Color selection dropdown
+    ReminderModal.tsx   # Reminder configuration UI
+    ErrorBoundary.tsx   # Global error boundary
+  store/
+    noteStore.ts        # Zustand state + Tauri IPC
+  types/
+    index.ts            # TypeScript types + color config
+
+src-tauri/              # Rust backend
+  src/
+    lib.rs              # Data model, persistence, window mgmt, tray, reminder scheduler
+    main.rs             # Binary entry point
+  capabilities/
+    default.json        # Tauri permissions
+  Cargo.toml            # Rust dependencies
+  tauri.conf.json       # Tauri configuration
+```
+
+## Architecture
+
+Each sticky note runs as an independent Tauri webview window:
+
+- **Manager window** (hidden) — manages system tray and app lifecycle
+- **Note windows** — borderless, transparent, always-on-top, skip taskbar
+- **Reminder scheduler** — background thread polls every 30s, fires OS notifications
+- **Data** — stored as `notes.json` in the OS app data directory
+
+## License
+
+MIT

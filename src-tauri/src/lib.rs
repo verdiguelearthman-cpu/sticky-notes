@@ -2,11 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconEvent,
-    AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder,
 };
+use tauri_plugin_notification::NotificationExt;
 
 // ─── Data Model ───
 
@@ -22,7 +25,6 @@ pub struct Note {
     pub height: f64,
     pub pinned: bool,
     pub collapsed: bool,
-    pub opacity: f64,
     pub reminder: Option<Reminder>,
     pub created_at: String,
     pub updated_at: String,
@@ -63,7 +65,16 @@ fn get_data_path(app: &AppHandle) -> PathBuf {
 
 fn load_data(path: &PathBuf) -> AppData {
     match fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(data) => data,
+            Err(e) => {
+                log::warn!("Failed to parse notes.json: {}. Backing up corrupted file.", e);
+                // Backup corrupted file
+                let backup = path.with_extension("json.bak");
+                fs::copy(path, &backup).ok();
+                AppData::default()
+            }
+        },
         Err(_) => AppData::default(),
     }
 }
@@ -91,10 +102,11 @@ fn create_note_window(app: &AppHandle, note: &Note) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, &label, url)
         .title("")
         .inner_size(note.width, note.height)
+        .min_inner_size(200.0, 120.0)
         .position(note.x, note.y)
         .decorations(false)
         .transparent(true)
-        .always_on_top(true)
+        .always_on_top(note.pinned)
         .skip_taskbar(true)
         .resizable(true)
         .visible(true);
@@ -136,7 +148,6 @@ fn create_note(app: AppHandle, state: State<AppState>, color: Option<String>) ->
         height: 320.0,
         pinned: true,
         collapsed: false,
-        opacity: 1.0,
         reminder: None,
         created_at: now.clone(),
         updated_at: now,
@@ -214,6 +225,105 @@ fn show_all_notes(app: AppHandle, state: State<AppState>) -> Result<(), String> 
         create_note_window(&app, note).ok();
     }
     Ok(())
+}
+
+// ─── Reminder Scheduler ───
+
+fn start_reminder_scheduler(app: AppHandle) {
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(30));
+            check_reminders(&app);
+        }
+    });
+}
+
+fn check_reminders(app: &AppHandle) {
+    let state: State<AppState> = app.state();
+    let now = chrono::Local::now();
+
+    let mut data = state.data.lock().unwrap();
+    let mut triggered_ids: Vec<(String, String)> = Vec::new(); // (note_id, title)
+
+    for note in data.notes.iter() {
+        if let Some(ref reminder) = note.reminder {
+            if let Ok(reminder_time) = chrono::NaiveDateTime::parse_from_str(&reminder.time, "%Y-%m-%dT%H:%M") {
+                let reminder_local = reminder_time.and_local_timezone(chrono::Local)
+                    .single();
+
+                if let Some(reminder_dt) = reminder_local {
+                    let diff = now.signed_duration_since(reminder_dt);
+                    // Fire if within the last 60 seconds (covers the 30s poll interval with margin)
+                    if diff.num_seconds() >= 0 && diff.num_seconds() < 60 {
+                        triggered_ids.push((note.id.clone(), note.title.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    // Update triggered reminders: advance repeat or clear
+    for (ref id, _) in &triggered_ids {
+        if let Some(note) = data.notes.iter_mut().find(|n| &n.id == id) {
+            if let Some(ref reminder) = note.reminder.clone() {
+                match reminder.repeat.as_str() {
+                    "daily" => {
+                        if let Ok(t) = chrono::NaiveDateTime::parse_from_str(&reminder.time, "%Y-%m-%dT%H:%M") {
+                            let next = t + chrono::Duration::days(1);
+                            note.reminder = Some(Reminder {
+                                time: next.format("%Y-%m-%dT%H:%M").to_string(),
+                                repeat: reminder.repeat.clone(),
+                            });
+                        }
+                    }
+                    "weekly" => {
+                        if let Ok(t) = chrono::NaiveDateTime::parse_from_str(&reminder.time, "%Y-%m-%dT%H:%M") {
+                            let next = t + chrono::Duration::weeks(1);
+                            note.reminder = Some(Reminder {
+                                time: next.format("%Y-%m-%dT%H:%M").to_string(),
+                                repeat: reminder.repeat.clone(),
+                            });
+                        }
+                    }
+                    "weekday" => {
+                        if let Ok(t) = chrono::NaiveDateTime::parse_from_str(&reminder.time, "%Y-%m-%dT%H:%M") {
+                            let mut next = t + chrono::Duration::days(1);
+                            // Skip weekends
+                            while next.weekday() == chrono::Weekday::Sat || next.weekday() == chrono::Weekday::Sun {
+                                next += chrono::Duration::days(1);
+                            }
+                            note.reminder = Some(Reminder {
+                                time: next.format("%Y-%m-%dT%H:%M").to_string(),
+                                repeat: reminder.repeat.clone(),
+                            });
+                        }
+                    }
+                    _ => {
+                        // "none" — clear the reminder after firing
+                        note.reminder = None;
+                    }
+                }
+            }
+        }
+    }
+    drop(data);
+
+    // Fire notifications and save
+    if !triggered_ids.is_empty() {
+        save_data(&state);
+
+        for (id, title) in &triggered_ids {
+            // System notification
+            let _ = app.notification()
+                .builder()
+                .title("StickyNotes Reminder")
+                .body(&format!("📋 {}", title))
+                .show();
+
+            // Also emit event to frontend so the note window can flash
+            let _ = app.emit(&format!("reminder-fired-{}", id), ());
+        }
+    }
 }
 
 // ─── App Entry ───
@@ -298,6 +408,9 @@ pub fn run() {
                     create_note_window(app.handle(), note).ok();
                 }
             }
+
+            // Start reminder scheduler (polls every 30s)
+            start_reminder_scheduler(app.handle().clone());
 
             Ok(())
         })

@@ -1,4 +1,5 @@
 import { StickyNote } from './components/StickyNote';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function App() {
   // Extract noteId from URL query param: ?noteId=xxx
@@ -10,7 +11,11 @@ function App() {
     return null;
   }
 
-  return <StickyNote noteId={noteId} />;
+  return (
+    <ErrorBoundary>
+      <StickyNote noteId={noteId} />
+    </ErrorBoundary>
+  );
 }
 
 export default App;

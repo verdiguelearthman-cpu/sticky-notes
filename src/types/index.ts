@@ -14,7 +14,6 @@ export interface Note {
   height: number;
   pinned: boolean;
   collapsed: boolean;
-  opacity: number;
   reminder: Reminder | null;
   created_at: string;
   updated_at: string;

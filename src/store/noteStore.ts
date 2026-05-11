@@ -65,10 +65,19 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
   },
 
-  togglePin: () => {
+  togglePin: async () => {
     const note = get().note;
     if (note) {
-      set({ note: { ...note, pinned: !note.pinned } });
+      const newPinned = !note.pinned;
+      set({ note: { ...note, pinned: newPinned } });
+      // Sync always-on-top with Tauri window
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        const win = getCurrentWebviewWindow();
+        await win.setAlwaysOnTop(newPinned);
+      } catch (_) {
+        // ignore if window API not available
+      }
       get().saveNote();
     }
   },
