@@ -1,3 +1,4 @@
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -498,7 +499,7 @@ pub fn run() {
                 .build()?;
 
             // Build tray icon
-            let _tray = tauri::tray::TrayIconBuilder::new(app)
+            let _tray = tauri::tray::TrayIconBuilder::new()
                 .menu(&menu)
                 .tooltip("StickyNotes")
                 .on_menu_event(move |app, event| {
@@ -525,7 +526,7 @@ pub fn run() {
                         let _ = create_note(app.clone(), state, None);
                     }
                 })
-                .build()?;
+                .build(app)?;
 
             // Restore existing notes on startup
             if has_notes {
