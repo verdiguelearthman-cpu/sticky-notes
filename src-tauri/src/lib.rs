@@ -498,8 +498,17 @@ pub fn run() {
                 .item(&quit)
                 .build()?;
 
-            // Build tray icon
+            // Build tray icon with embedded icon
+            let tray_icon_image = tauri::image::Image::from_path(
+                app.path().resolve("icons/32x32.png", tauri::path::BaseDirectory::Resource)
+                    .unwrap_or_else(|_| std::path::PathBuf::from("icons/32x32.png"))
+            ).unwrap_or_else(|_| {
+                tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+                    .expect("failed to load tray icon")
+            });
+
             let _tray = tauri::tray::TrayIconBuilder::new()
+                .icon(tray_icon_image)
                 .menu(&menu)
                 .tooltip("StickyNotes")
                 .on_menu_event(move |app, event| {
