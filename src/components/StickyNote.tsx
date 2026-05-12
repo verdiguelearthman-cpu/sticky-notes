@@ -2,8 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import DOMPurify from 'dompurify';
 import { useNoteStore } from '../store/noteStore';
-import { getColorConfig, NOTE_COLORS } from '../types';
-import type { NoteColor } from '../types';
+import { getColorConfig } from '../types';
 import { ColorPicker } from './ColorPicker';
 import { ReminderModal } from './ReminderModal';
 
@@ -33,9 +32,9 @@ export function StickyNote({ noteId }: { noteId: string }) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const deleteTimer = useRef<ReturnType<typeof setTimeout>>();
+  const deleteTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const contentRef = useRef<HTMLDivElement>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Load note data
   useEffect(() => {
