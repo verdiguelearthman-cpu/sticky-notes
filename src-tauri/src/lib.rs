@@ -88,6 +88,54 @@ fn save_data(state: &AppState) {
     }
 }
 
+// ─── Smart Positioning ───
+
+/// Calculate a non-overlapping position for a new note using cascade with wrap-around.
+fn find_next_position(app: &AppHandle, existing_notes: &[Note], note_width: f64, note_height: f64) -> (f64, f64) {
+    const CASCADE_OFFSET_X: f64 = 30.0;
+    const CASCADE_OFFSET_Y: f64 = 30.0;
+    const BASE_X: f64 = 100.0;
+    const BASE_Y: f64 = 100.0;
+    const OVERLAP_THRESHOLD: f64 = 10.0;
+
+    // Try to get actual screen size from primary monitor, fallback to conservative defaults
+    let (max_x, max_y) = if let Ok(Some(monitor)) = app.primary_monitor() {
+        let size = monitor.size();
+        (size.width as f64 - 100.0, size.height as f64 - 100.0)
+    } else {
+        (1600.0, 900.0)
+    };
+
+    let mut candidate_x = BASE_X;
+    let mut candidate_y = BASE_Y;
+    let mut wrap_count = 0u32;
+
+    // Try up to 50 cascade slots before giving up
+    for _ in 0..50 {
+        let overlaps = existing_notes.iter().any(|note| {
+            (note.x - candidate_x).abs() < OVERLAP_THRESHOLD
+                && (note.y - candidate_y).abs() < OVERLAP_THRESHOLD
+        });
+
+        if !overlaps {
+            return (candidate_x, candidate_y);
+        }
+
+        candidate_x += CASCADE_OFFSET_X;
+        candidate_y += CASCADE_OFFSET_Y;
+
+        // Wrap around if off-screen, interleave with half-offset
+        if candidate_x + note_width > max_x || candidate_y + note_height > max_y {
+            wrap_count += 1;
+            let offset = (wrap_count as f64) * CASCADE_OFFSET_X / 2.0;
+            candidate_x = BASE_X + offset;
+            candidate_y = BASE_Y + offset;
+        }
+    }
+
+    (candidate_x, candidate_y)
+}
+
 // ─── Window Management ───
 
 fn create_note_window(app: &AppHandle, note: &Note) -> Result<(), String> {
@@ -139,15 +187,24 @@ fn get_note(state: State<AppState>, id: String) -> Option<Note> {
 #[tauri::command]
 fn create_note(app: AppHandle, state: State<AppState>, color: Option<String>) -> Result<Note, String> {
     let now = chrono::Local::now().to_rfc3339();
+    let width = 280.0;
+    let height = 320.0;
+
+    // Smart position: avoid overlapping existing notes
+    let (x, y) = {
+        let data = state.data.lock().unwrap();
+        find_next_position(&app, &data.notes, width, height)
+    };
+
     let note = Note {
         id: uuid::Uuid::new_v4().to_string(),
         title: String::from("New Note"),
         content: String::new(),
         color: color.unwrap_or_else(|| "yellow".into()),
-        x: 200.0,
-        y: 150.0,
-        width: 280.0,
-        height: 320.0,
+        x,
+        y,
+        width,
+        height,
         pinned: true,
         collapsed: false,
         reminder: None,
