@@ -199,7 +199,7 @@ fn create_note(app: AppHandle, state: State<AppState>, color: Option<String>) ->
 
     let note = Note {
         id: uuid::Uuid::new_v4().to_string(),
-        title: String::from("New Note"),
+        title: String::from("新便签"),
         content: String::new(),
         color: color.unwrap_or_else(|| "yellow".into()),
         x,
@@ -434,7 +434,7 @@ fn check_reminders(app: &AppHandle) {
             // System notification
             let _ = app.notification()
                 .builder()
-                .title("StickyNotes Reminder")
+                .title("便签提醒")
                 .body(&format!("📋 {}", title))
                 .show();
 
@@ -484,11 +484,11 @@ pub fn run() {
             app.manage(state);
 
             // Build tray menu
-            let new_note = MenuItemBuilder::with_id("new_note", "New Note")
+            let new_note = MenuItemBuilder::with_id("new_note", "新建便签")
                 .build(app)?;
-            let show_all = MenuItemBuilder::with_id("show_all", "Show All Notes")
+            let show_all = MenuItemBuilder::with_id("show_all", "显示所有便签")
                 .build(app)?;
-            let quit = MenuItemBuilder::with_id("quit", "Quit")
+            let quit = MenuItemBuilder::with_id("quit", "退出")
                 .build(app)?;
 
             let menu = MenuBuilder::new(app)
@@ -502,7 +502,7 @@ pub fn run() {
             let _tray = tauri::tray::TrayIconBuilder::new()
                 .icon(tauri::include_image!("icons/32x32.png"))
                 .menu(&menu)
-                .tooltip("StickyNotes")
+                .tooltip("便签")
                 .on_menu_event(move |app, event| {
                     match event.id().as_ref() {
                         "new_note" => {

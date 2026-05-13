@@ -45,9 +45,9 @@ export class ErrorBoundary extends Component<Props, State> {
           }}
         >
           <div style={{ fontSize: 24 }}>⚠️</div>
-          <div style={{ fontWeight: 600 }}>Something went wrong</div>
+          <div style={{ fontWeight: 600 }}>出错了</div>
           <div style={{ opacity: 0.6, fontSize: 11, textAlign: 'center' }}>
-            {this.state.error?.message ?? 'Unknown error'}
+            {this.state.error?.message ?? '未知错误'}
           </div>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
@@ -62,7 +62,7 @@ export class ErrorBoundary extends Component<Props, State> {
               color: 'inherit',
             }}
           >
-            Retry
+            重试
           </button>
         </div>
       );

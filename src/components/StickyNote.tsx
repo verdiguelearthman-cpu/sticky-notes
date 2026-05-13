@@ -170,7 +170,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
 
         {/* Action buttons */}
         <NoteButton
-          title="Color"
+          title="颜色"
           onClick={() => setShowColorPicker(!showColorPicker)}
           textColor={colorConfig.text}
         >
@@ -178,7 +178,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
         </NoteButton>
 
         <NoteButton
-          title={note.pinned ? 'Unpin' : 'Pin to top'}
+          title={note.pinned ? '取消置顶' : '置顶'}
           onClick={togglePin}
           textColor={colorConfig.text}
         >
@@ -190,7 +190,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
         </NoteButton>
 
         <NoteButton
-          title={note.collapsed ? 'Expand' : 'Collapse'}
+          title={note.collapsed ? '展开' : '收起'}
           onClick={toggleCollapse}
           textColor={colorConfig.text}
         >
@@ -201,7 +201,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
         </NoteButton>
 
         <NoteButton
-          title={confirmDelete ? 'Click again to confirm' : 'Delete'}
+          title={confirmDelete ? '再次点击确认删除' : '删除'}
           onClick={() => {
             if (confirmDelete) {
               clearTimeout(deleteTimer.current);
@@ -290,7 +290,7 @@ export function StickyNote({ noteId }: { noteId: string }) {
                 fill="currentColor"
               />
             </svg>
-            {note.reminder ? note.reminder.time : 'Reminder'}
+            {note.reminder ? note.reminder.time : '提醒'}
           </button>
         </div>
       )}

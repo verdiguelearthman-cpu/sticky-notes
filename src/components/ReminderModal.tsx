@@ -51,11 +51,11 @@ export function ReminderModal({ current, onSave, onClose }: Props) {
         }}
       >
         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
-          Set Reminder
+          设置提醒
         </h4>
 
         <label style={{ fontSize: 12, color: '#9496B0', display: 'block', marginBottom: 4 }}>
-          Time
+          时间
         </label>
         <input
           type="datetime-local"
@@ -76,7 +76,7 @@ export function ReminderModal({ current, onSave, onClose }: Props) {
         />
 
         <label style={{ fontSize: 12, color: '#9496B0', display: 'block', marginBottom: 4 }}>
-          Repeat
+          重复
         </label>
         <select
           value={repeat}
@@ -94,23 +94,23 @@ export function ReminderModal({ current, onSave, onClose }: Props) {
             boxSizing: 'border-box',
           }}
         >
-          <option value="none">No repeat</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="weekday">Weekdays</option>
+          <option value="none">不重复</option>
+          <option value="daily">每天</option>
+          <option value="weekly">每周</option>
+          <option value="weekday">工作日</option>
         </select>
 
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
           {current && (
             <button onClick={handleRemove} style={btnStyle('#FF6B6B', 'transparent')}>
-              Remove
+              移除
             </button>
           )}
           <button onClick={onClose} style={btnStyle('#9496B0', 'rgba(255,255,255,0.06)')}>
-            Cancel
+            取消
           </button>
           <button onClick={handleSave} style={btnStyle('#1A1B2E', '#F0D800')}>
-            Save
+            保存
           </button>
         </div>
       </div>
